@@ -130,6 +130,7 @@ def build_sparse_index(model, docs: list[dict], batch_size: int):
                 return_sparse=True,
                 return_colbert_vecs=False,
                 batch_size=len(batch),
+                max_length=512,   # truncate long docs — sparse weights don't need 8192 tokens
             )
             all_sparse.extend(output["lexical_weights"])
             pbar.update(len(batch))
