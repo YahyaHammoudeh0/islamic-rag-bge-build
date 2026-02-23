@@ -41,8 +41,13 @@ DEFAULT_BATCH_SIZE = 32   # reduce to 8-16 if OOM on CPU
 
 # ── Load BGE-M3 ───────────────────────────────────────────────────────────────
 
-def load_model(device: str = "auto"):
-    """Load BGE-M3 model. Auto-detects GPU if available."""
+def load_model(device: str = "auto", model_dir: str = None):
+    """Load BGE-M3 model. Auto-detects GPU if available.
+    
+    Args:
+        device:    'auto', 'cuda', or 'cpu'
+        model_dir: path to local model dir (skip HuggingFace download)
+    """
     from FlagEmbedding import BGEM3FlagModel
 
     if device == "auto":
@@ -58,10 +63,11 @@ def load_model(device: str = "auto"):
             device = "cpu"
             print("  [BGE-M3] PyTorch not found, using CPU")
 
+    model_path = model_dir if model_dir else BGE_MODEL_NAME
     use_fp16 = (device != "cpu")
-    print(f"  [BGE-M3] Loading model (fp16={use_fp16})...")
+    print(f"  [BGE-M3] Loading model from: {model_path}  (fp16={use_fp16})...")
     model = BGEM3FlagModel(
-        BGE_MODEL_NAME,
+        model_path,
         use_fp16=use_fp16,
         device=device,
     )
@@ -220,6 +226,7 @@ def main():
     parser.add_argument("--output-dir",  type=Path, default=DEFAULT_OUTPUT_DIR, help="Output directory for index files")
     parser.add_argument("--batch-size",  type=int,  default=DEFAULT_BATCH_SIZE, help="Encoding batch size (lower if OOM)")
     parser.add_argument("--device",      type=str,  default="auto",             help="Device: auto, cuda, cpu")
+    parser.add_argument("--model-dir",   type=str,  default=None,               help="Path to local BGE-M3 model dir (skips HuggingFace download)")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -229,10 +236,11 @@ def main():
     print(f"Output dir: {args.output_dir}")
     print(f"Batch size: {args.batch_size}")
     print(f"Device:     {args.device}")
+    print(f"Model:      {args.model_dir or 'BAAI/bge-m3 (HuggingFace)'}")
     print()
 
     # Load model
-    model = load_model(device=args.device)
+    model = load_model(device=args.device, model_dir=args.model_dir)
 
     # Load docs
     docs = load_all_docs(args.data_dir)
