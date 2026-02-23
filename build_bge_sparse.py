@@ -117,8 +117,12 @@ def build_sparse_index(model, docs: list[dict], batch_size: int):
     all_sparse = []   # list of {token_id: weight} dicts
     t0 = time.time()
 
-    for i in tqdm(range(0, n_docs, batch_size), desc="BGE-M3 sparse encode"):
-        batch = texts[i : i + batch_size]
+    current_batch = batch_size
+    i = 0
+    pbar = tqdm(total=n_docs, desc="BGE-M3 sparse encode")
+
+    while i < n_docs:
+        batch = texts[i : i + current_batch]
         try:
             output = model.encode(
                 batch,
@@ -128,9 +132,21 @@ def build_sparse_index(model, docs: list[dict], batch_size: int):
                 batch_size=len(batch),
             )
             all_sparse.extend(output["lexical_weights"])
-        except Exception as e:
-            print(f"\n  WARN: batch {i}-{i+batch_size} failed: {e}, filling with empty")
-            all_sparse.extend([{} for _ in batch])
+            pbar.update(len(batch))
+            i += current_batch
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower() and current_batch > 1:
+                current_batch = max(1, current_batch // 2)
+                print(f"\n  OOM — reducing batch size to {current_batch} and retrying...", flush=True)
+                try:
+                    import torch; torch.cuda.empty_cache()
+                except Exception:
+                    pass
+            else:
+                print(f"\n  ERROR at batch {i}: {e}")
+                raise
+
+    pbar.close()
 
     elapsed = time.time() - t0
     docs_per_sec = n_docs / elapsed
